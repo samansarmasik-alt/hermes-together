@@ -16,10 +16,10 @@ from .online import (
     DEFAULT_RELAY_URL,
     OnlineRelayClient,
     OnlineRelayError,
-    new_room_code,
     validate_room_code,
 )
 
+ONLINE_ROOMS_URL = f"{DEFAULT_RELAY_URL}/"
 _LOG = logging.getLogger(__name__)
 _POLL_SECONDS = 0.35
 _HEARTBEAT_SECONDS = 5.0
@@ -569,22 +569,24 @@ def _help() -> str:
         "  /together status          Show connected CLI windows\n"
         "  /together send <message>  Send a message to every other room member\n"
         "  /together name <name>     Set this CLI's display name\n"
-        "  /together thread          Start a new bounded exchange\n"
+        "  /together thread          Start a new exchange\n"
         "  /together leave           Leave the local room\n"
-        "  /together-online create  Create and join an online room\n"
-        "  /together-online <code>  Join an online room on another machine"
+        "  /together-online          Get a code at the website\n"
+        "  /together-online <code>   Join an online room from any supported CLI"
     )
 
 
 def _online_help() -> str:
     return (
-        "Hermes Together online commands:\n"
-        "  /together-online create  Create a room and print its shareable code\n"
-        "  /together-online <code>  Join that room from another CLI or machine\n"
+        "Create an online room:\n"
+        f"  1. Visit {ONLINE_ROOMS_URL} and click 'Oda kodu oluştur'.\n"
+        "  2. Give the code only to intended participants.\n"
+        "  3. Each Hermes, OpenCode, or Codex CLI joins with /together-online <code>.\n"
+        "  /together-online <code>  Join using the website code\n"
         "  /together-online status  Show online connection status\n"
         "  /together-online leave   Disconnect from the online relay\n"
         "Only one local or online room can be active per CLI; leave the current room to switch. "
-        "Messages go only to the online room while connected. The relay uses TLS but can read messages; "
+        "Messages go only to connected room members. The relay uses TLS but can read messages; "
         "do not share secrets or credentials."
     )
 
@@ -603,15 +605,12 @@ def _online_command(runtime: TogetherRuntime, raw_args: str) -> str:
     if verb == "leave" and not remainder:
         return runtime.leave_online()
     if verb == "create" and not remainder:
-        room_code = new_room_code()
-        result = runtime.join_online(room_code)
-        if result.startswith(("Joined", "Already joined")):
-            return f"{result}\nShare this room code with trusted participants: {room_code}"
         return (
-            f"{result}\nGenerated room code (retry after the relay is ready): {room_code}"
+            f"Online room codes are now created on the website: {ONLINE_ROOMS_URL} "
+            "Click 'Oda kodu oluştur', then run /together-online <code>."
         )
     if separator:
-        return "Usage: /together-online create | /together-online <room-code> | status | leave"
+        return f"Usage: visit {ONLINE_ROOMS_URL}, create a code, then run /together-online <code> | status | leave"
     return runtime.join_online(raw)
 
 
@@ -685,7 +684,7 @@ def register(ctx: Any) -> None:
         "together-online",
         handler=lambda raw: _online_command(runtime, raw),
         description="Join a secure online Together room across machines",
-        args_hint="[create|<room-code>|status|leave|help]",
+        args_hint="[<room-code>|status|leave|help]",
     )
 
     def send_tool(

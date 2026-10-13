@@ -59,13 +59,6 @@ def validate_room_code(room_code: str) -> str:
     return room_code
 
 
-def new_room_code() -> str:
-    """Return a high-entropy, URL-safe bearer code accepted by the relay."""
-    import secrets
-
-    return secrets.token_urlsafe(32)
-
-
 def _printable_name(value: str) -> str:
     name = " ".join(value.split()) if isinstance(value, str) else ""
     if not name or len(name) > 48 or not name.isprintable():

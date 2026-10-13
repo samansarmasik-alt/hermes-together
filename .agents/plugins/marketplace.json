@@ -1,0 +1,17 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/marketplace.schema.json",
+  "name": "hermes-together",
+  "interface": {
+    "displayName": "Hermes Together"
+  },
+  "plugins": [
+    {
+      "name": "hermes-together",
+      "source": {
+        "source": "local",
+        "path": "./integrations/codex"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

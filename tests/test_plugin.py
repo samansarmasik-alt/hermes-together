@@ -326,15 +326,25 @@ class TogetherPluginTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             context = FakeContext()
             with patch("hermes_together.plugin.create_bus", return_value=TogetherBus(Path(tempdir) / "db")), \
-                 patch("hermes_together.plugin.OnlineRelayClient", FakeOnlineClient), \
-                 patch("hermes_together.plugin.new_room_code", return_value=room_code):
+                 patch("hermes_together.plugin.OnlineRelayClient", FakeOnlineClient):
                 register(context)
-                created = context.commands["together-online"]("create")
-                self.assertIn(room_code, created)
+                landing = context.commands["together-online"]("")
+                self.assertIn("https://hermes-together-render-relay.onrender.com/", landing)
+                self.assertIn("Oda kodu oluştur", landing)
+                self.assertEqual(clients, [], "opening the command must not create or join a room")
+
+                legacy_create = context.commands["together-online"]("create")
+                self.assertIn("website", legacy_create.lower())
+                self.assertEqual(clients, [], "room creation now belongs to the website")
+
+                joined = context.commands["together-online"](room_code)
+                self.assertIn("online room", joined.lower())
+                self.assertTrue(clients[-1].connected)
+                self.assertEqual(clients[-1].room_code, room_code)
                 self.assertEqual(clients[-1].relay_url, "https://hermes-together-render-relay.onrender.com")
 
-                joined = context.commands["together-online"](next_code)
-                self.assertIn("online room", joined.lower())
+                switched = context.commands["together-online"](next_code)
+                self.assertIn("online room", switched.lower())
                 self.assertTrue(clients[0].closed, "joining a different code must close the previous relay socket")
                 self.assertEqual(clients[-1].room_code, next_code)
 
@@ -500,7 +510,9 @@ class TogetherPluginTests(unittest.TestCase):
             with patch("hermes_together.plugin.create_bus", return_value=TogetherBus(Path(tempdir) / "db")):
                 register(context)
                 help_text = context.commands["together-online"]("help")
-        self.assertIn("create", help_text)
+        self.assertIn("https://hermes-together-render-relay.onrender.com/", help_text)
+        self.assertIn("Oda kodu oluştur", help_text)
+        self.assertNotIn("/together-online create", help_text)
         self.assertIn("code", help_text.lower())
 
     def test_status_reports_inactive_and_help_lists_supported_commands(self) -> None:
