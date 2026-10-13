@@ -53,6 +53,13 @@ class TogetherBusTests(unittest.TestCase):
         with self.assertRaises(BusError):
             self.bus.read(self.room, "alice", self.alice_cursor)
 
+    def test_exchange_allows_twenty_four_messages_then_stops(self) -> None:
+        thread_id = "exchange01"
+        for index in range(24):
+            self.bus.send(self.room, "alice" if index % 2 == 0 else "bob", f"message {index}", thread_id=thread_id)
+        with self.assertRaisesRegex(BusError, "24-message safety limit"):
+            self.bus.send(self.room, "alice", "message 25", thread_id=thread_id)
+
     def test_replies_in_one_thread_have_a_hard_bound(self) -> None:
         first = self.bus.send(self.room, "alice", "Start a bounded exchange")
         thread_id = first["thread_id"]

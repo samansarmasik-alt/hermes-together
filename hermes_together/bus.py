@@ -21,7 +21,7 @@ class TogetherBus:
     """Small SQLite-backed mailbox shared by independent Hermes processes."""
 
     MAX_MESSAGE_CHARS = 4_000
-    MAX_THREAD_MESSAGES = 8
+    MAX_THREAD_MESSAGES = 24
     MAX_MESSAGES_PER_MINUTE = 20
     MAX_MESSAGES_PER_ROOM = 500
     MAX_THREADS_PER_ROOM = 10_000
@@ -266,7 +266,7 @@ class TogetherBus:
             if usage is not None and int(usage["message_count"]) >= self.MAX_THREAD_MESSAGES:
                 raise BusError(
                     f"This exchange reached its {self.MAX_THREAD_MESSAGES}-message safety limit. "
-                    "Start a new user-led exchange instead of continuing the loop."
+                    "A user must run /together thread to start another exchange; do not roll over silently."
                 )
             if usage is None:
                 thread_total = conn.execute(
