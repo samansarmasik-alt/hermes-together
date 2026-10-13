@@ -53,22 +53,13 @@ class TogetherBusTests(unittest.TestCase):
         with self.assertRaises(BusError):
             self.bus.read(self.room, "alice", self.alice_cursor)
 
-    def test_exchange_allows_twenty_four_messages_then_stops(self) -> None:
+    def test_exchange_has_no_per_thread_message_cap(self) -> None:
         thread_id = "exchange01"
-        for index in range(24):
-            self.bus.send(self.room, "alice" if index % 2 == 0 else "bob", f"message {index}", thread_id=thread_id)
-        with self.assertRaisesRegex(BusError, "24-message safety limit"):
-            self.bus.send(self.room, "alice", "message 25", thread_id=thread_id)
-
-    def test_replies_in_one_thread_have_a_hard_bound(self) -> None:
-        first = self.bus.send(self.room, "alice", "Start a bounded exchange")
-        thread_id = first["thread_id"]
-        for index in range(self.bus.MAX_THREAD_MESSAGES - 1):
-            sender = "bob" if index % 2 == 0 else "alice"
-            self.bus.send(self.room, sender, f"reply {index}", thread_id=thread_id)
-
-        with self.assertRaises(BusError):
-            self.bus.send(self.room, "bob", "must be blocked", thread_id=thread_id)
+        with patch.object(TogetherBus, "MAX_MESSAGES_PER_MINUTE", 200):
+            for index in range(100):
+                sender = "alice" if index % 2 == 0 else "bob"
+                sent = self.bus.send(self.room, sender, f"message {index}", thread_id=thread_id)
+                self.assertEqual(sent["thread_id"], thread_id)
 
     def test_omitted_thread_id_reuses_the_sender_current_thread(self) -> None:
         first = self.bus.send(self.room, "alice", "first")
@@ -76,13 +67,27 @@ class TogetherBusTests(unittest.TestCase):
 
         self.assertEqual(first["thread_id"], second["thread_id"])
 
-    def test_thread_limit_survives_message_retention(self) -> None:
+    def test_unbounded_thread_continues_after_message_retention(self) -> None:
         thread_id = "retained01"
-        with patch.object(TogetherBus, "MAX_MESSAGES_PER_ROOM", 1):
-            for index in range(self.bus.MAX_THREAD_MESSAGES):
-                self.bus.send(self.room, "alice", f"message {index}", thread_id=thread_id)
-            with self.assertRaises(BusError):
-                self.bus.send(self.room, "bob", "must be blocked", thread_id=thread_id)
+        with patch.object(TogetherBus, "MAX_MESSAGES_PER_ROOM", 1), \
+             patch.object(TogetherBus, "MAX_MESSAGES_PER_MINUTE", 200):
+            for index in range(100):
+                sender = "alice" if index % 2 == 0 else "bob"
+                self.bus.send(self.room, sender, f"message {index}", thread_id=thread_id)
+
+        conn = sqlite3.connect(self.db_path)
+        try:
+            stored_messages = conn.execute(
+                "SELECT COUNT(*) FROM together_messages WHERE room_id = ?", (self.room,)
+            ).fetchone()[0]
+            usage_count = conn.execute(
+                "SELECT message_count FROM together_thread_usage WHERE room_id = ? AND thread_id = ?",
+                (self.room, thread_id),
+            ).fetchone()[0]
+        finally:
+            conn.close()
+        self.assertEqual(stored_messages, 1)
+        self.assertEqual(usage_count, 100)
 
     def test_legacy_database_migrates_thread_usage_and_sender_thread(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
@@ -117,9 +122,12 @@ class TogetherBusTests(unittest.TestCase):
             migrated = TogetherBus(path)
             continued = migrated.send("legacy-room", "alice", "continues without id")
             self.assertEqual(continued["thread_id"], "legacy001")
-            with patch.object(TogetherBus, "MAX_THREAD_MESSAGES", 3):
-                with self.assertRaises(BusError):
-                    migrated.send("legacy-room", "bob", "cap includes legacy messages")
+            with patch.object(TogetherBus, "MAX_MESSAGES_PER_MINUTE", 100):
+                for index in range(32):
+                    continued = migrated.send(
+                        "legacy-room", "bob", f"legacy reply {index}", thread_id="legacy001"
+                    )
+            self.assertEqual(continued["thread_id"], "legacy001")
 
     def test_concurrent_writers_get_unique_monotonic_sequences(self) -> None:
         workers = []
