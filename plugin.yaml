@@ -1,0 +1,17 @@
+name: hermes-together
+version: 0.1.0
+manifest_version: 2
+api_version: 1
+requires_hermes: ">=0.21.5"
+license: MIT
+description: Local, live collaboration between open Hermes CLI windows.
+homepage: https://github.com/samansarmasik-alt/hermes-together
+provides_hooks:
+  - pre_llm_call
+provides_tools:
+  - together_send
+tags:
+  - agents
+  - collaboration
+  - cli
+  - local

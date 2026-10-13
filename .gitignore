@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+*.db
+*.db-shm
+*.db-wal
+.venv/
+.pytest_cache/
+
+# Separate private Render relay source; never include it in this public repository.
+render-relay-private/
